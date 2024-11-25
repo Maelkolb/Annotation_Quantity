@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Comparison Annotation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .text-comparison { display: flex; flex-direction: column; gap: 20px; }
+        .text-box { border: 1px solid #ccc; padding: 10px; border-radius: 5px; cursor: pointer; }
+        .text-box:hover { background-color: #f0f0f0; }
+        .selected-best { border-color: green; }
+        .selected-worst { border-color: red; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div id="intro">
+        <h1>Text Comparison Annotation</h1>
+        <p>Press the "Space" key to start annotating.</p>
+        <pre id="dataset-preview"></pre>
+    </div>
+
+    <div id="annotation-section" class="hidden">
+        <h2>Annotate Texts</h2>
+        <p><strong>Task:</strong> Identify the text that conveys the highest quantity (Best) and the lowest quantity (Worst) of animal occurrence.</p>
+        <div id="text-container" class="text-comparison"></div>
+        <button id="next-button">Next</button>
+    </div>
+
+    <div id="finish-section" class="hidden">
+        <h2>Annotation Complete</h2>
+        <button id="export-button">Export Annotations</button>
+    </div>
+
+    <!-- Embedded JSONL content -->
+    <script id="dataset" type="application/json">
+    [
+        {"texts": ["Text 1 example", "Text 2 example", "Text 3 example", "Text 4 example"]},
+        {"texts": ["Another 1", "Another 2", "Another 3", "Another 4"]}
+    ]
+    </script>
+
+    <script>
+        let annotations = [];
+        let currentIndex = 0;
+        let textTuples = [];
+
+        function loadDataset() {
+            const datasetScript = document.getElementById('dataset').textContent;
+            return JSON.parse(datasetScript.trim());
+        }
+
+        function displayIntro(dataset) {
+            const preview = dataset.slice(0, 3).map(tuple => JSON.stringify(tuple, null, 2)).join('\n\n');
+            document.getElementById('dataset-preview').textContent = preview;
+        }
+
+        function setupAnnotation(task) {
+            const container = document.getElementById('text-container');
+            container.innerHTML = '';
+            task.forEach((text, index) => {
+                const textDiv = document.createElement('div');
+                textDiv.classList.add('text-box');
+                textDiv.textContent = `${index + 1}. ${text}`;
+                textDiv.dataset.index = index;
+                textDiv.addEventListener('click', () => handleSelection(textDiv));
+                container.appendChild(textDiv);
+            });
+        }
+
+        function handleSelection(textDiv) {
+            const index = textDiv.dataset.index;
+            if (!textDiv.classList.contains('selected-best') && !textDiv.classList.contains('selected-worst')) {
+                if (!document.querySelector('.selected-best')) {
+                    textDiv.classList.add('selected-best');
+                } else if (!document.querySelector('.selected-worst')) {
+                    textDiv.classList.add('selected-worst');
+                }
+            } else {
+                textDiv.classList.remove('selected-best', 'selected-worst');
+            }
+        }
+
+        function saveAnnotation() {
+            const best = document.querySelector('.selected-best')?.dataset.index;
+            const worst = document.querySelector('.selected-worst')?.dataset.index;
+
+            if (best !== undefined && worst !== undefined) {
+                annotations.push({
+                    tupleIndex: currentIndex,
+                    Best: parseInt(best) + 1,
+                    Worst: parseInt(worst) + 1
+                });
+                return true;
+            } else {
+                alert('Please select both a Best and Worst text before proceeding.');
+                return false;
+            }
+        }
+
+        function handleNext() {
+            if (saveAnnotation()) {
+                currentIndex++;
+                if (currentIndex < textTuples.length) {
+                    setupAnnotation(textTuples[currentIndex].texts);
+                } else {
+                    document.getElementById('annotation-section').classList.add('hidden');
+                    document.getElementById('finish-section').classList.remove('hidden');
+                }
+            }
+        }
+
+        function exportAnnotations() {
+            const blob = new Blob([annotations.map(a => JSON.stringify(a)).join('\n')], { type: 'application/jsonl' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'annotations.jsonl';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const dataset = loadDataset();
+            displayIntro(dataset);
+
+            document.addEventListener('keydown', (event) => {
+                if (event.code === 'Space' && currentIndex === 0) {
+                    textTuples = dataset.sort(() => 0.5 - Math.random()).slice(0, 50);
+                    setupAnnotation(textTuples[currentIndex].texts);
+                    document.getElementById('intro').classList.add('hidden');
+                    document.getElementById('annotation-section').classList.remove('hidden');
+                }
+            });
+
+            document.getElementById('next-button').addEventListener('click', handleNext);
+            document.getElementById('export-button').addEventListener('click', exportAnnotations);
+        });
+    </script>
+</body>
+</html>
